@@ -1,5 +1,7 @@
+
 import dotenv from 'dotenv';
 import path from 'node:path';
+import dns from 'node:dns';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,8 +12,12 @@ dotenv.config({
   path: path.resolve(__dirname, '../../.env')
 });
 
-// Import the app only after loading local environment variables. In hosted
-// environments these values are supplied by the platform instead.
+// Fix MongoDB Atlas DNS resolution
+if (process.env.NODE_ENV !== 'production') {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
+
+// Import the app only after loading environment variables
 const [{ default: app }, { connectDatabase }] = await Promise.all([
   import('./app.js'),
   import('./config/db.js')
