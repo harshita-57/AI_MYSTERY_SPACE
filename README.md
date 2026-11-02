@@ -6,22 +6,40 @@ The repository was empty aside from `spec.md`; this implementation builds the fi
 
 ## Requirements
 
-- Node.js 20 or newer
-- npm 10 or newer
-- MongoDB (local or hosted)
+- Node.js 20 or newer and npm 10 or newer
+- A MongoDB database (MongoDB Atlas works for deployment)
 - A Google Gemini API key for case generation and AI interactions
 
-Optional Cloudinary and image-generation credentials are listed in `.env.example`. The core experience works without media generation and uses clearly described text evidence instead of unrelated generated images. Audio evidence is labeled as a transcript when no audio provider is configured.
+Optional Cloudinary and image-generation credentials enable media features. The core experience uses text evidence without them.
 
 ## Start locally
 
-1. Copy `.env.example` to `.env` in the repository root.
+1. Copy `.env.example` to `.env` in the repository root (or create it using the variables below).
 2. Set `MONGODB_URI`, `GEMINI_API_KEY`, and a long random `JWT_SECRET`.
 3. Install the workspace dependencies with `npm install`.
 4. Start MongoDB, then run `npm run dev`.
 5. Open <http://localhost:5173>.
 
-The Vite development server proxies `/api` to Express at `http://localhost:4000`. To run the production build, use `npm run build`, then run `npm start` for the API. Serve the `client/dist` directory from a static host or reverse proxy and set `CLIENT_URL` to that origin.
+The Vite development server proxies `/api` to Express at `http://localhost:4000`. In production, `npm run build` creates the frontend and `npm start` serves both the frontend and API from one Express process. This same-origin setup also supports the HTTP-only login cookies.
+
+## Deploy to Render
+
+This is a practical first deployment using Render for the web service and MongoDB Atlas for the database. The included `render.yaml` describes the build and start commands.
+
+1. **Prepare MongoDB Atlas.** Create a free cluster, create a database user with a strong password, and add the Render service's outbound access to Atlas Network Access. For a first deploy, Atlas can allow access from anywhere (`0.0.0.0/0`) while the database password remains strong; restrict this later if you use a fixed egress IP. Copy the application's `mongodb+srv://...` connection string and replace its password placeholder, URL-encoding special characters in the password.
+2. **Prepare Gemini.** Create an API key in Google AI Studio. Keep it private; it belongs only in the Render server environment.
+3. **Push this project to a GitHub repository.** Ensure `.env` is not committed; it is ignored by `.gitignore`.
+4. **Create the Render service.** In Render, choose **New → Blueprint**, connect the repository, and apply the `render.yaml` blueprint. It creates one Node web service, builds the Vite client, then starts Express.
+5. **Set the service environment variables** in Render's Environment page:
+   - `MONGODB_URI`: the Atlas connection string.
+   - `GEMINI_API_KEY`: the Google AI Studio key.
+   - `JWT_SECRET`: a long random secret (at least 32 random bytes). Generate one locally with `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`.
+   - `NODE_ENV`: `production` (the blueprint sets this).
+   `PORT` is provided by Render. Leave `CLIENT_URL` unset for this single-origin deployment. Optional media variables can be added later.
+6. **Deploy and check health.** Wait for the build to finish, open the Render service URL, then visit `<your-service-url>/api/health`. It should return JSON with `"status":"ok"`. Register an account and generate a case to verify MongoDB and Gemini connectivity.
+7. **For later updates**, push commits to the connected branch; Render rebuilds and deploys automatically. If you add a separate frontend host later, set `CLIENT_URL` to that exact origin and review cross-site cookie requirements.
+
+For local setup, create `.env` in the repository root and set `MONGODB_URI`, `GEMINI_API_KEY`, and a long random `JWT_SECRET`. Never put server credentials in Vite variables or commit `.env`.
 
 ## Environment variables
 
@@ -31,7 +49,7 @@ The Vite development server proxies `/api` to Express at `http://localhost:4000`
 | `MONGODB_URI` | MongoDB connection string |
 | `GEMINI_API_KEY` | Server-only Gemini credential |
 | `GEMINI_MODEL` | Gemini model (default `gemini-2.5-flash`) |
-| `CLIENT_URL` | Allowed browser origin; comma-separated origins are supported |
+| `CLIENT_URL` | Optional allowed browser origins for a separately hosted frontend; comma-separated origins are supported |
 | `JWT_SECRET` | Random secret used to sign secure HTTP-only session cookies |
 | `JWT_EXPIRES_IN` | Session duration (default `7d`) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Optional media storage credentials |

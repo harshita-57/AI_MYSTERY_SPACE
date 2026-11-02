@@ -1,12 +1,6 @@
-import dns from 'node:dns';
-
-dns.setServers(['8.8.8.8', '1.1.1.1']);
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import app from './app.js';
-import { connectDatabase } from './config/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +9,13 @@ const __dirname = path.dirname(__filename);
 dotenv.config({
   path: path.resolve(__dirname, '../../.env')
 });
+
+// Import the app only after loading local environment variables. In hosted
+// environments these values are supplied by the platform instead.
+const [{ default: app }, { connectDatabase }] = await Promise.all([
+  import('./app.js'),
+  import('./config/db.js')
+]);
 
 const port = Number(process.env.PORT) || 4000;
 
